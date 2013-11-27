@@ -14,6 +14,7 @@ from flask import Flask
 
 app = Flask(__name__)
 app.debug = True
+app.secret_key = 'flask-snippets-fsp'
 
 
 if __name__ == "__main__":
