@@ -1,0 +1,58 @@
+# ${:outfile}
+#
+# Configuration for use with paster/WSGI
+#
+
+[loggers]
+keys = root, wsgi
+
+[handlers]
+keys = console, accesslog
+
+[formatters]
+keys = generic, accesslog
+
+[formatter_generic]
+format = %(asctime)s %(levelname)s [%(name)s] %(message)s
+
+[formatter_accesslog]
+format = %(message)s
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[handler_accesslog]
+class = FileHandler
+args = (os.path.join(r'${server:logfiles}', 'access.log'), 'a')
+level = INFO
+formatter = accesslog
+
+[logger_root]
+level = INFO
+handlers = console
+
+[logger_wsgi]
+level = INFO
+handlers = accesslog
+qualname = wsgi
+propagate = 0
+
+[filter:translogger]
+use = egg:Paste#translogger
+setup_console_handler = False
+logger_name = wsgi
+
+[app:main]
+use = egg:${:app}
+filter-with = translogger
+
+[server:main]
+use = egg:Paste#http
+host = ${server:host}
+port = ${server:port}
+threadpool_workers = ${:workers}
+threadpool_spawn_if_under = ${:spawn_if_under}
+threadpool_max_requests = ${:max_requests}
