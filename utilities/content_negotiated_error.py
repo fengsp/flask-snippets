@@ -1,49 +1,37 @@
 # -*- coding: utf-8 -*-
 """
-    utilities.content_negotiated_error
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    utilities.context_global_socketio
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    Content negotiated error responses
-    http://flask.pocoo.org/snippets/97/
+    Using Context Globals with Gevent-Socketio
+    http://flask.pocoo.org/snippets/105/
 """
 
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
-from flask import make_response, abort as flask_abort, request
-from werkzeug.exceptions import default_exceptions, HTTPException
-from flask.exceptions import JSONHTTPException
+from socketio import socketio_manage
+@app.route('/socket.io/<path:path>')
+def run_socketio(path):
+    real_request = request._get_current_object()
+    socketio_manage(request.environ, {'': FlaskNamespace},
+            request=real_request)
+    return Response()
 
-from app import app
+from socketio.namespace import BaseNamespace
+class FlaskNamespace(BaseNamespace):
+    def __init__(self, *args, **kwargs):
+        request = kwargs.get('request', None)
+        self.ctx = None
+        if request:
+            self.ctx = current_app.request_context(request.environ)
+            self.ctx.push()
+            current_app.preprocess_request()
+            del kwargs['request']
+        super(BaseNamespace, self).__init__(*args, **kwargs)
 
-
-def abort(status_code, body=None, headers={}):
-    """
-    Content negiate the error response.
-
-    """
-    if 'text/html' in request.headers.get("Accept", ""):
-        error_cls = HTTPException
-    else:
-        error_cls = JSONHTTPException
-
-    class_name = error_cls.__name__
-    bases = [error_cls]
-    attributes = {'code': status_code}
-
-    if status_code in default_exceptions:
-        # Mixin the Werkzeug exception
-        bases.insert(0, default_exceptions[status_code])
-
-    error_cls = type(class_name, tuple(bases), attributes)
-    flask_abort(make_response(error_cls(body), status_code, headers))
-
-
-@app.route("/test")
-def view():
-    abort(422, {'errors': dict(password="Wrong password")})
-
-
-if __name__ == "__main__":
-    app.run()
+    def disconnect(self, *args, **kwargs):
+        if self.ctx:
+            self.ctx.pop()
+        super(BaseNamespace, self).disconnect(*args, **kwargs)
